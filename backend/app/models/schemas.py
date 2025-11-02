@@ -91,6 +91,9 @@ class ObservationCreate(BaseModel):
     audio_text: Optional[str] = None
     date: str
     is_emergency: bool = False
+    has_animal_images: bool = False
+    has_enclosure_images: bool = False
+    has_emergency_video: bool = False
 
 class AudioTranscription(BaseModel):
     audio_file: bytes
