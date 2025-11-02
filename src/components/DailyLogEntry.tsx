@@ -106,7 +106,30 @@ export function DailyLogEntry() {
 
   const handleStartRecording = async () => {
     try {
+      // Check if mediaDevices API is available
+      if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) {
+        toast.error(
+          language === 'en' 
+            ? 'Audio recording is not supported in this browser/environment' 
+            : 'इस ब्राउज़र/वातावरण में ऑडियो रिकॉर्डिंग समर्थित नहीं है'
+        );
+        return;
+      }
+
+      // Request microphone permission
       const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+      
+      // Check if MediaRecorder is supported
+      if (!window.MediaRecorder) {
+        toast.error(
+          language === 'en' 
+            ? 'Media recording is not supported in this browser' 
+            : 'इस ब्राउज़र में मीडिया रिकॉर्डिंग समर्थित नहीं है'
+        );
+        stream.getTracks().forEach(track => track.stop());
+        return;
+      }
+
       const mediaRecorder = new MediaRecorder(stream);
       mediaRecorderRef.current = mediaRecorder;
       audioChunksRef.current = [];
@@ -124,14 +147,47 @@ export function DailyLogEntry() {
         stream.getTracks().forEach(track => track.stop());
       };
 
+      mediaRecorder.onerror = (event) => {
+        console.error('MediaRecorder error:', event);
+        toast.error(
+          language === 'en' 
+            ? 'Recording error occurred' 
+            : 'रिकॉर्डिंग त्रुटि हुई'
+        );
+        stream.getTracks().forEach(track => track.stop());
+      };
+
       mediaRecorder.start();
       setIsRecording(true);
       setRecordingTime(0);
       setHasRecording(false);
       toast.success(language === 'en' ? 'Recording started' : 'रिकॉर्डिंग शुरू हुई');
-    } catch (error) {
+    } catch (error: any) {
       console.error('Error starting recording:', error);
-      toast.error(language === 'en' ? 'Could not access microphone' : 'माइक्रोफ़ोन तक नहीं पहुंच सका');
+      
+      let errorMessage = language === 'en' 
+        ? 'Could not access microphone. Please grant microphone permission.' 
+        : 'माइक्रोफ़ोन तक नहीं पहुंच सका। कृपया माइक्रोफ़ोन अनुमति दें।';
+      
+      if (error.name === 'NotAllowedError' || error.name === 'PermissionDeniedError') {
+        errorMessage = language === 'en'
+          ? '🎤 Microphone permission denied. Please allow microphone access in your browser settings.'
+          : '🎤 माइक्रोफ़ोन अनुमति अस्वीकार। कृपया अपने ब्राउज़र सेटिंग्स में माइक्रोफ़ोन एक्सेस की अनुमति दें।';
+      } else if (error.name === 'NotFoundError' || error.name === 'DevicesNotFoundError') {
+        errorMessage = language === 'en'
+          ? '🎤 No microphone found. Please connect a microphone and try again.'
+          : '🎤 कोई माइक्रोफ़ोन नहीं मिला। कृपया माइक्रोफ़ोन कनेक्ट करें और पुनः प्रयास करें।';
+      } else if (error.name === 'NotReadableError' || error.name === 'TrackStartError') {
+        errorMessage = language === 'en'
+          ? '🎤 Microphone is already in use by another application.'
+          : '🎤 माइक्रोफ़ोन पहले से किसी अन्य एप्लिकेशन द्वारा उपयोग में है।';
+      } else if (error.name === 'NotSupportedError') {
+        errorMessage = language === 'en'
+          ? '🎤 Audio recording is not supported in this environment. Try using text input instead.'
+          : '🎤 इस वातावरण में ऑडियो रिकॉर्डिंग समर्थित नहीं है। इसके बजाय टेक्स्ट इनपुट का उपयोग करें।';
+      }
+      
+      toast.error(errorMessage, { duration: 5000 });
     }
   };
 
@@ -358,6 +414,13 @@ export function DailyLogEntry() {
                   </div>
                 ) : (
                   <div className="space-y-4">
+                    <div className="bg-blue-50 dark:bg-blue-900/20 border border-blue-200 dark:border-blue-800 rounded-lg p-3 mb-4">
+                      <p className="text-sm text-blue-800 dark:text-blue-200">
+                        {language === 'en' 
+                          ? '🎤 Tip: Click the microphone button below to start recording. Your browser will ask for microphone permission - please allow it to use audio recording.' 
+                          : '🎤 सुझाव: रिकॉर्डिंग शुरू करने के लिए नीचे माइक्रोफ़ोन बटन पर क्लिक करें। आपका ब्राउज़र माइक्रोफ़ोन अनुमति मांगेगा - कृपया इसे ऑडियो रिकॉर्डिंग के लिए अनुमति दें।'}
+                      </p>
+                    </div>
                     <div className="flex flex-col items-center gap-4">
                       {!hasRecording ? (
                         <>
