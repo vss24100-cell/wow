@@ -1,0 +1,68 @@
+modules = ["nodejs-20", "web", "python-3.11"]
+[agent]
+expertMode = true
+
+[nix]
+channel = "stable-25_05"
+packages = ["libxcrypt"]
+
+[workflows]
+runButton = "Project"
+
+[[workflows.workflow]]
+name = "Project"
+mode = "parallel"
+author = "agent"
+
+[[workflows.workflow.tasks]]
+task = "workflow.run"
+args = "ZooCare Frontend"
+
+[[workflows.workflow.tasks]]
+task = "workflow.run"
+args = "ZooCare Backend"
+
+[[workflows.workflow]]
+name = "ZooCare Frontend"
+author = "agent"
+
+[[workflows.workflow.tasks]]
+task = "shell.exec"
+args = "npm run dev"
+waitForPort = 5000
+
+[workflows.workflow.metadata]
+outputType = "webview"
+
+[[workflows.workflow]]
+name = "ZooCare Backend"
+author = "agent"
+
+[[workflows.workflow.tasks]]
+task = "shell.exec"
+args = "cd backend && python run.py"
+waitForPort = 8000
+
+[workflows.workflow.metadata]
+outputType = "console"
+
+[[ports]]
+localPort = 5000
+externalPort = 80
+
+[[ports]]
+localPort = 8000
+externalPort = 8000
+
+[[ports]]
+localPort = 39387
+externalPort = 3001
+
+[[ports]]
+localPort = 39645
+externalPort = 3000
+
+[deployment]
+deploymentTarget = "autoscale"
+run = ["npx", "vite", "preview", "--host", "0.0.0.0", "--port"]
+build = ["npm", "run", "build"]
