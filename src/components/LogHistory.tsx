@@ -1,7 +1,7 @@
-import React, { useContext, useState } from 'react';
+import React, { useContext, useState, useEffect } from 'react';
 import { AppContext } from '../App';
 import { translations } from './mockData';
-import { ArrowLeft, Calendar as CalendarIcon, ChevronLeft, ChevronRight, FileText, Mic, Image as ImageIcon, Clock, Filter, X } from 'lucide-react';
+import { ArrowLeft, Calendar as CalendarIcon, ChevronLeft, ChevronRight, FileText, Mic, Image as ImageIcon, Clock, Filter, X, Loader2 } from 'lucide-react';
 import { Button } from './ui/button';
 import { Card } from './ui/card';
 import { Calendar } from './ui/calendar';
@@ -10,6 +10,8 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from './ui/tabs';
 import { motion } from 'motion/react';
 import { ImageWithFallback } from './figma/ImageWithFallback';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from './ui/select';
+import { api } from '../services/api';
+import { toast } from 'sonner';
 
 interface LogEntry {
   id: string;
@@ -27,90 +29,74 @@ interface LogEntry {
   injuries: boolean;
 }
 
-// Mock data for previous logs
-const mockLogs: LogEntry[] = [
-  {
-    id: '1',
-    date: new Date(2025, 9, 28), // Oct 28, 2025
-    animalName: 'Raja (Tiger)',
-    animalImage: 'https://images.unsplash.com/photo-1561731216-c3a4d99437d5?w=400',
-    keeper: 'Rajesh Kumar',
-    mood: 80,
-    appetite: 90,
-    movement: 75,
-    hasRecording: true,
-    hasImages: true,
-    hasNotes: true,
-    notes: 'Very active today, enjoyed meat feeding',
-    injuries: false,
-  },
-  {
-    id: '2',
-    date: new Date(2025, 9, 27), // Oct 27, 2025
-    animalName: 'Raja (Tiger)',
-    animalImage: 'https://images.unsplash.com/photo-1561731216-c3a4d99437d5?w=400',
-    keeper: 'Rajesh Kumar',
-    mood: 75,
-    appetite: 85,
-    movement: 70,
-    hasRecording: true,
-    hasImages: false,
-    hasNotes: true,
-    notes: 'Normal behavior, slight lethargy in afternoon',
-    injuries: false,
-  },
-  {
-    id: '3',
-    date: new Date(2025, 9, 25), // Oct 25, 2025
-    animalName: 'Moti (Elephant)',
-    animalImage: 'https://images.unsplash.com/photo-1564760055775-d63b17a55c44?w=400',
-    keeper: 'Sunita Devi',
-    mood: 85,
-    appetite: 95,
-    movement: 80,
-    hasRecording: true,
-    hasImages: true,
-    hasNotes: true,
-    notes: 'Excellent appetite, played in water',
-    injuries: false,
-  },
-  {
-    id: '4',
-    date: new Date(2025, 9, 24), // Oct 24, 2025
-    animalName: 'Laila (Lioness)',
-    animalImage: 'https://images.unsplash.com/photo-1614027164847-1b28cfe1df60?w=400',
-    keeper: 'Amit Sharma',
-    mood: 70,
-    appetite: 80,
-    movement: 65,
-    hasRecording: false,
-    hasImages: true,
-    hasNotes: true,
-    notes: 'Resting most of the day',
-    injuries: false,
-  },
-];
-
 export function LogHistory() {
   const { language, setCurrentScreen, selectedAnimal, setSelectedAnimal } = useContext(AppContext);
   const t = translations[language];
   const [selectedDate, setSelectedDate] = useState<Date | undefined>(new Date());
   const [viewMode, setViewMode] = useState<'calendar' | 'list'>('calendar');
   const [filterAnimal, setFilterAnimal] = useState<string>('all');
+  const [logs, setLogs] = useState<LogEntry[]>([]);
+  const [animals, setAnimals] = useState<any[]>([]);
+  const [isLoading, setIsLoading] = useState(true);
 
-  // Clear selected animal when component mounts to avoid unintended filtering
-  React.useEffect(() => {
-    // Optional: Uncomment if you want to clear selection on mount
-    // setSelectedAnimal(null);
-  }, []);
+  // Fetch observations and animals from API
+  useEffect(() => {
+    const fetchData = async () => {
+      setIsLoading(true);
+      try {
+        const [observationsData, animalsData] = await Promise.all([
+          api.getObservations(),
+          api.getAnimals()
+        ]);
+
+        setAnimals(animalsData);
+
+        // Transform observations to LogEntry format
+        const transformedLogs: LogEntry[] = observationsData.map((obs: any) => {
+          const animal = animalsData.find((a: any) => a.id === obs.animal_id);
+          const observationDate = obs.date_or_day ? new Date(obs.date_or_day) : new Date(obs.created_at);
+          
+          // Calculate health metrics from observation data
+          const mood = obs.normal_behaviour_status ? 85 : 60;
+          const appetite = obs.feed_given_as_prescribed ? 90 : 65;
+          const movement = obs.animal_observed_on_time ? 80 : 55;
+          
+          return {
+            id: obs.id,
+            date: observationDate,
+            animalName: animal ? `${animal.name} (${animal.species})` : 'Unknown Animal',
+            animalImage: animal?.image_url || 'https://images.unsplash.com/photo-1564760055775-d63b17a55c44?w=400',
+            keeper: obs.incharge_signature || 'Unknown Keeper',
+            mood,
+            appetite,
+            movement,
+            hasRecording: true,
+            hasImages: obs.images && obs.images.length > 0,
+            hasNotes: Boolean(obs.normal_behaviour_details || obs.other_animal_requirements),
+            notes: obs.normal_behaviour_details || obs.other_animal_requirements || '',
+            injuries: false,
+          };
+        });
+
+        setLogs(transformedLogs);
+      } catch (error) {
+        console.error('Failed to fetch log history:', error);
+        toast.error(language === 'en' ? 'Failed to load log history' : 'लॉग इतिहास लोड करने में विफल');
+      } finally {
+        setIsLoading(false);
+      }
+    };
+
+    fetchData();
+  }, [language]);
 
   // Get unique animal names from logs
-  const uniqueAnimals = Array.from(new Set(mockLogs.map(log => log.animalName)));
+  const uniqueAnimals = Array.from(new Set(logs.map(log => log.animalName)));
 
   // Filter logs by selected animal filter
   const animalLogs = filterAnimal === 'all'
-    ? mockLogs
-    : mockLogs.filter(log => log.animalName === filterAnimal);
+    ? logs
+    : logs.filter(log => log.animalName === filterAnimal);
 
   // Get logs for selected date
   const logsForDate = selectedDate
@@ -133,6 +119,19 @@ export function LogHistory() {
     if (value >= 50) return language === 'en' ? 'Fair' : 'सामान्य';
     return language === 'en' ? 'Poor' : 'खराब';
   };
+
+  if (isLoading) {
+    return (
+      <div className="min-h-screen bg-gradient-to-b from-green-50 to-amber-50 dark:from-gray-900 dark:to-gray-800 flex items-center justify-center">
+        <div className="text-center">
+          <Loader2 className="w-12 h-12 text-green-600 animate-spin mx-auto mb-4" />
+          <p className="text-green-900 dark:text-green-100">
+            {language === 'en' ? 'Loading log history...' : 'लॉग इतिहास लोड हो रहा है...'}
+          </p>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <motion.div 
