@@ -1,13 +1,15 @@
 import { useContext, useState, useRef, useEffect } from 'react';
 import { AppContext } from '../App';
 import { translations } from './mockData';
-import { ArrowLeft, Mic, Square, Loader2, Sparkles, Calendar as CalendarIcon } from 'lucide-react';
+import { ArrowLeft, Mic, Square, Loader2, Sparkles, Calendar as CalendarIcon, FileText, Image as ImageIcon, Video, Lock, Upload, X, Edit2 } from 'lucide-react';
 import { motion } from 'motion/react';
 import { Button } from './ui/button';
 import { Card } from './ui/card';
 import { Label } from './ui/label';
 import { Input } from './ui/input';
 import { Checkbox } from './ui/checkbox';
+import { Textarea } from './ui/textarea';
+import { Tabs, TabsList, TabsTrigger, TabsContent } from './ui/tabs';
 import { toast } from 'sonner';
 import { api } from '../services/api';
 
@@ -34,6 +36,9 @@ export function DailyLogEntry() {
 
   const [animalName, setAnimalName] = useState<string>('');
   const [selectedDate, setSelectedDate] = useState<string>(new Date().toISOString().split('T')[0]);
+  const [inputMethod, setInputMethod] = useState<'audio' | 'text'>('audio');
+  const [textInput, setTextInput] = useState<string>('');
+  const [isEmergency, setIsEmergency] = useState(false);
 
   const [isRecording, setIsRecording] = useState(false);
   const [recordingTime, setRecordingTime] = useState(0);
@@ -41,7 +46,12 @@ export function DailyLogEntry() {
   const [isProcessing, setIsProcessing] = useState(false);
   const [audioBlob, setAudioBlob] = useState<Blob | null>(null);
   
+  const [animalImages, setAnimalImages] = useState<File[]>([]);
+  const [enclosureImages, setEnclosureImages] = useState<File[]>([]);
+  const [emergencyVideo, setEmergencyVideo] = useState<File | null>(null);
+  
   const [showAIForm, setShowAIForm] = useState(false);
+  const [isEditMode, setIsEditMode] = useState(false);
   const [formData, setFormData] = useState<AIGeneratedForm>({
     date_or_day: new Date().toLocaleDateString('en-IN'),
     animal_observed_on_time: true,
@@ -180,14 +190,48 @@ export function DailyLogEntry() {
 
   const [processedTranscript, setProcessedTranscript] = useState('');
 
+  const handleImageUpload = (e: React.ChangeEvent<HTMLInputElement>, type: 'animal' | 'enclosure') => {
+    const files = Array.from(e.target.files || []);
+    if (files.length > 0) {
+      if (type === 'animal') {
+        setAnimalImages(prev => [...prev, ...files]);
+        toast.success(language === 'en' ? `${files.length} animal image(s) added` : `${files.length} जानवर की तस्वीरें जोड़ी गईं`);
+      } else {
+        setEnclosureImages(prev => [...prev, ...files]);
+        toast.success(language === 'en' ? `${files.length} enclosure image(s) added` : `${files.length} बाड़े की तस्वीरें जोड़ी गईं`);
+      }
+    }
+  };
+
+  const handleVideoUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (file) {
+      setEmergencyVideo(file);
+      toast.success(language === 'en' ? 'Emergency video added' : 'आपातकालीन वीडियो जोड़ा गया');
+    }
+  };
+
+  const removeImage = (index: number, type: 'animal' | 'enclosure') => {
+    if (type === 'animal') {
+      setAnimalImages(prev => prev.filter((_, i) => i !== index));
+    } else {
+      setEnclosureImages(prev => prev.filter((_, i) => i !== index));
+    }
+  };
+
   const handleProcessInput = async () => {
     if (!animalName.trim()) {
       toast.error(language === 'en' ? 'Please enter animal name' : 'कृपया जानवर का नाम दर्ज करें');
       return;
     }
 
-    if (!audioBlob) {
+    if (inputMethod === 'audio' && !audioBlob) {
       toast.error(language === 'en' ? 'No audio recorded' : 'कोई ऑडियो रिकॉर्ड नहीं हुआ');
+      return;
+    }
+
+    if (inputMethod === 'text' && !textInput.trim()) {
+      toast.error(language === 'en' ? 'Please enter observation text' : 'कृपया अवलोकन पाठ दर्ज करें');
       return;
     }
 
@@ -195,9 +239,15 @@ export function DailyLogEntry() {
     toast.info(language === 'en' ? 'Processing with AI...' : 'AI के साथ प्रोसेस हो रहा है...');
 
     try {
-      const transcribeResult = await api.transcribeAudio(audioBlob, language === 'hi' ? 'hi' : 'en');
-      const transcript = transcribeResult.transcript;
-      toast.success(language === 'en' ? 'Audio transcribed!' : 'ऑडियो ट्रांसक्राइब हो गया!');
+      let transcript = '';
+      
+      if (inputMethod === 'audio' && audioBlob) {
+        const transcribeResult = await api.transcribeAudio(audioBlob, language === 'hi' ? 'hi' : 'en');
+        transcript = transcribeResult.transcript;
+        toast.success(language === 'en' ? 'Audio transcribed!' : 'ऑडियो ट्रांसक्राइब हो गया!');
+      } else {
+        transcript = textInput;
+      }
 
       setProcessedTranscript(transcript);
 
@@ -229,19 +279,29 @@ export function DailyLogEntry() {
     }
 
     setIsSaving(true);
-    toast.info(language === 'en' ? 'Saving observation with AI...' : 'AI के साथ अवलोकन सहेजा जा रहा है...');
+    const message = isEmergency 
+      ? (language === 'en' ? '🚨 Saving emergency observation...' : '🚨 आपातकालीन अवलोकन सहेजा जा रहा है...')
+      : (language === 'en' ? 'Saving observation...' : 'अवलोकन सहेजा जा रहा है...');
+    toast.info(message);
 
     try {
       const observationData = {
         animal_name: animalName,
         audio_text: processedTranscript,
         date: selectedDate,
-        is_emergency: false,
+        is_emergency: isEmergency,
+        has_animal_images: animalImages.length > 0,
+        has_enclosure_images: enclosureImages.length > 0,
+        has_emergency_video: emergencyVideo !== null,
       };
 
       await api.createObservation(observationData);
       
-      toast.success(language === 'en' ? '✨ Observation saved successfully!' : '✨ अवलोकन सफलतापूर्वक सहेजा गया!');
+      const successMessage = isEmergency
+        ? (language === 'en' ? '🚨 Emergency observation saved! Alert sent.' : '🚨 आपातकालीन अवलोकन सहेजा गया! अलर्ट भेजा गया।')
+        : (language === 'en' ? '✨ Observation saved successfully!' : '✨ अवलोकन सफलतापूर्वक सहेजा गया!');
+      
+      toast.success(successMessage);
       
       setTimeout(() => {
         setCurrentScreen('dashboard');
@@ -252,6 +312,10 @@ export function DailyLogEntry() {
     } finally {
       setIsSaving(false);
     }
+  };
+
+  const updateFormField = (field: keyof AIGeneratedForm, value: any) => {
+    setFormData(prev => ({ ...prev, [field]: value }));
   };
 
   const formatTime = (seconds: number) => {
@@ -316,7 +380,7 @@ export function DailyLogEntry() {
             <motion.div
               initial={{ opacity: 0, y: 20 }}
               animate={{ opacity: 1, y: 0 }}
-              transition={{ delay: 0.2 }}
+              transition={{ delay: 0.15 }}
             >
               <Card className="p-6 bg-white dark:bg-gray-800">
                 <Label className="text-green-900 dark:text-green-100 mb-2 flex items-center gap-2">
@@ -336,65 +400,177 @@ export function DailyLogEntry() {
             <motion.div
               initial={{ opacity: 0, y: 20 }}
               animate={{ opacity: 1, y: 0 }}
+              transition={{ delay: 0.2 }}
+            >
+              <Card className="p-6 bg-white dark:bg-gray-800">
+                <div className="flex items-center gap-2 mb-2">
+                  <Checkbox
+                    id="emergency"
+                    checked={isEmergency}
+                    onCheckedChange={(checked: boolean) => setIsEmergency(checked)}
+                  />
+                  <Label htmlFor="emergency" className="text-red-600 dark:text-red-400 font-medium cursor-pointer">
+                    🚨 {language === 'en' ? 'Mark as Emergency' : 'आपातकालीन के रूप में चिह्नित करें'}
+                  </Label>
+                </div>
+                {isEmergency && (
+                  <p className="text-sm text-red-600 dark:text-red-400 mt-1">
+                    {language === 'en' ? 'Emergency alerts will be sent to veterinarians and supervisors' : 'पशु चिकित्सकों और पर्यवेक्षकों को आपातकालीन अलर्ट भेजे जाएंगे'}
+                  </p>
+                )}
+              </Card>
+            </motion.div>
+
+            <motion.div
+              initial={{ opacity: 0, y: 20 }}
+              animate={{ opacity: 1, y: 0 }}
+              transition={{ delay: 0.25 }}
+            >
+              <Card className="p-6 bg-white dark:bg-gray-800">
+                <Tabs value={inputMethod} onValueChange={(value: string) => setInputMethod(value as 'audio' | 'text')}>
+                  <TabsList className="grid w-full grid-cols-2 mb-4">
+                    <TabsTrigger value="audio" className="flex items-center gap-2">
+                      <Mic className="w-4 h-4" />
+                      {language === 'en' ? 'Audio' : 'ऑडियो'}
+                    </TabsTrigger>
+                    <TabsTrigger value="text" className="flex items-center gap-2">
+                      <FileText className="w-4 h-4" />
+                      {language === 'en' ? 'Text' : 'टेक्स्ट'}
+                    </TabsTrigger>
+                  </TabsList>
+
+                  <TabsContent value="audio" className="space-y-4">
+                    <div className="bg-blue-50 dark:bg-blue-900/20 border border-blue-200 dark:border-blue-800 rounded-lg p-3">
+                      <p className="text-sm text-blue-800 dark:text-blue-200">
+                        {language === 'en' 
+                          ? '🎤 Click the microphone button to start recording. Your browser will ask for permission.' 
+                          : '🎤 रिकॉर्डिंग शुरू करने के लिए माइक्रोफ़ोन बटन पर क्लिक करें।'}
+                      </p>
+                    </div>
+                    <div className="flex flex-col items-center gap-4">
+                      {!hasRecording ? (
+                        <>
+                          <div className="text-center">
+                            <motion.button
+                              whileHover={{ scale: 1.05 }}
+                              whileTap={{ scale: 0.95 }}
+                              onClick={isRecording ? handleStopRecording : handleStartRecording}
+                              className={`w-20 h-20 rounded-full flex items-center justify-center shadow-lg ${
+                                isRecording 
+                                  ? 'bg-red-500 hover:bg-red-600' 
+                                  : 'bg-green-600 hover:bg-green-700'
+                              }`}
+                            >
+                              {isRecording ? (
+                                <Square className="w-8 h-8 text-white" />
+                              ) : (
+                                <Mic className="w-8 h-8 text-white" />
+                              )}
+                            </motion.button>
+                          </div>
+                          {isRecording && (
+                            <div className="text-center">
+                              <p className="text-2xl font-mono text-red-600">{formatTime(recordingTime)}</p>
+                              <p className="text-sm text-gray-600 dark:text-gray-400">
+                                {language === 'en' ? 'Recording in progress...' : 'रिकॉर्डिंग चल रही है...'}
+                              </p>
+                            </div>
+                          )}
+                        </>
+                      ) : (
+                        <div className="text-center space-y-3">
+                          <p className="text-green-600 font-medium">
+                            ✓ {language === 'en' ? 'Recording completed' : 'रिकॉर्डिंग पूर्ण'}
+                          </p>
+                          <p className="text-sm text-gray-600">
+                            {language === 'en' ? 'Duration:' : 'अवधि:'} {formatTime(recordingTime)}
+                          </p>
+                          <Button variant="outline" onClick={() => {
+                            setHasRecording(false);
+                            setAudioBlob(null);
+                            setRecordingTime(0);
+                          }}>
+                            {language === 'en' ? 'Record Again' : 'फिर से रिकॉर्ड करें'}
+                          </Button>
+                        </div>
+                      )}
+                    </div>
+                  </TabsContent>
+
+                  <TabsContent value="text" className="space-y-4">
+                    <div className="bg-green-50 dark:bg-green-900/20 border border-green-200 dark:border-green-800 rounded-lg p-3">
+                      <p className="text-sm text-green-800 dark:text-green-200">
+                        {language === 'en' 
+                          ? '✍️ Type your observation details below. Include behavior, health, feeding, and any concerns.' 
+                          : '✍️ नीचे अपने अवलोकन विवरण टाइप करें। व्यवहार, स्वास्थ्य, भोजन और किसी भी चिंता को शामिल करें।'}
+                      </p>
+                    </div>
+                    <Textarea
+                      value={textInput}
+                      onChange={(e) => setTextInput(e.target.value)}
+                      placeholder={language === 'en' 
+                        ? 'Enter your observation notes here...\n\nExample: The tiger appeared healthy today. Fed at 9 AM with 5kg meat. Normal behavior observed, actively moving around the enclosure. Water provided and fresh.' 
+                        : 'यहाँ अपने अवलोकन नोट्स दर्ज करें...\n\nउदाहरण: बाघ आज स्वस्थ दिखाई दिया। सुबह 9 बजे 5 किलो मांस के साथ खिलाया गया। सामान्य व्यवहार देखा गया।'}
+                      rows={10}
+                      className="w-full resize-none"
+                    />
+                    <div className="text-sm text-gray-600 dark:text-gray-400">
+                      {textInput.length} {language === 'en' ? 'characters' : 'वर्ण'}
+                    </div>
+                  </TabsContent>
+                </Tabs>
+              </Card>
+            </motion.div>
+
+            <motion.div
+              initial={{ opacity: 0, y: 20 }}
+              animate={{ opacity: 1, y: 0 }}
               transition={{ delay: 0.3 }}
             >
               <Card className="p-6 bg-white dark:bg-gray-800">
-                <div className="space-y-4">
-                  <div className="bg-blue-50 dark:bg-blue-900/20 border border-blue-200 dark:border-blue-800 rounded-lg p-3 mb-4">
-                    <p className="text-sm text-blue-800 dark:text-blue-200">
-                      {language === 'en' 
-                        ? '🎤 Tip: Click the microphone button below to start recording. Your browser will ask for microphone permission - please allow it to use audio recording.' 
-                        : '🎤 सुझाव: रिकॉर्डिंग शुरू करने के लिए नीचे माइक्रोफ़ोन बटन पर क्लिक करें। आपका ब्राउज़र माइक्रोफ़ोन अनुमति मांगेगा - कृपया इसे ऑडियो रिकॉर्डिंग के लिए अनुमति दें।'}
-                    </p>
+                <Label className="text-green-900 dark:text-green-100 mb-3 flex items-center gap-2">
+                  <ImageIcon className="w-5 h-5" />
+                  {language === 'en' ? 'Animal Photos (Optional)' : 'जानवर की फोटो (वैकल्पिक)'}
+                </Label>
+                <div className="space-y-3">
+                  <div className="flex items-center gap-2">
+                    <Input
+                      type="file"
+                      accept="image/*"
+                      multiple
+                      onChange={(e) => handleImageUpload(e, 'animal')}
+                      className="hidden"
+                      id="animal-images"
+                    />
+                    <Button
+                      type="button"
+                      variant="outline"
+                      onClick={() => document.getElementById('animal-images')?.click()}
+                      className="w-full"
+                    >
+                      <Upload className="w-4 h-4 mr-2" />
+                      {language === 'en' ? 'Upload Animal Photos' : 'जानवर की फोटो अपलोड करें'}
+                    </Button>
                   </div>
-                  <div className="flex flex-col items-center gap-4">
-                    {!hasRecording ? (
-                      <>
-                        <div className="text-center">
-                          <motion.button
-                            whileHover={{ scale: 1.05 }}
-                            whileTap={{ scale: 0.95 }}
-                            onClick={isRecording ? handleStopRecording : handleStartRecording}
-                            className={`w-20 h-20 rounded-full flex items-center justify-center shadow-lg ${
-                              isRecording 
-                                ? 'bg-red-500 hover:bg-red-600' 
-                                : 'bg-green-600 hover:bg-green-700'
-                            }`}
+                  {animalImages.length > 0 && (
+                    <div className="grid grid-cols-3 gap-2">
+                      {animalImages.map((img, idx) => (
+                        <div key={idx} className="relative group">
+                          <img
+                            src={URL.createObjectURL(img)}
+                            alt={`Animal ${idx + 1}`}
+                            className="w-full h-20 object-cover rounded-lg"
+                          />
+                          <button
+                            onClick={() => removeImage(idx, 'animal')}
+                            className="absolute -top-1 -right-1 bg-red-500 text-white rounded-full p-1 opacity-0 group-hover:opacity-100 transition-opacity"
                           >
-                            {isRecording ? (
-                              <Square className="w-8 h-8 text-white" />
-                            ) : (
-                              <Mic className="w-8 h-8 text-white" />
-                            )}
-                          </motion.button>
+                            <X className="w-3 h-3" />
+                          </button>
                         </div>
-                        {isRecording && (
-                          <div className="text-center">
-                            <p className="text-2xl font-mono text-red-600">{formatTime(recordingTime)}</p>
-                            <p className="text-sm text-gray-600 dark:text-gray-400">
-                              {language === 'en' ? 'Recording in progress...' : 'रिकॉर्डिंग चल रही है...'}
-                            </p>
-                          </div>
-                        )}
-                      </>
-                    ) : (
-                      <div className="text-center space-y-3">
-                        <p className="text-green-600 font-medium">
-                          ✓ {language === 'en' ? 'Recording completed' : 'रिकॉर्डिंग पूर्ण'}
-                        </p>
-                        <p className="text-sm text-gray-600">
-                          {language === 'en' ? 'Duration:' : 'अवधि:'} {formatTime(recordingTime)}
-                        </p>
-                        <Button variant="outline" onClick={() => {
-                          setHasRecording(false);
-                          setAudioBlob(null);
-                          setRecordingTime(0);
-                        }}>
-                          {language === 'en' ? 'Record Again' : 'फिर से रिकॉर्ड करें'}
-                        </Button>
-                      </div>
-                    )}
-                  </div>
+                      ))}
+                    </div>
+                  )}
                 </div>
               </Card>
             </motion.div>
@@ -402,11 +578,113 @@ export function DailyLogEntry() {
             <motion.div
               initial={{ opacity: 0, y: 20 }}
               animate={{ opacity: 1, y: 0 }}
-              transition={{ delay: 0.4 }}
+              transition={{ delay: 0.35 }}
+            >
+              <Card className="p-6 bg-white dark:bg-gray-800">
+                <Label className="text-green-900 dark:text-green-100 mb-3 flex items-center gap-2">
+                  <Lock className="w-5 h-5" />
+                  {language === 'en' ? 'Enclosure/Lock Photos (Optional)' : 'बाड़ा/ताला की फोटो (वैकल्पिक)'}
+                </Label>
+                <div className="space-y-3">
+                  <div className="flex items-center gap-2">
+                    <Input
+                      type="file"
+                      accept="image/*"
+                      multiple
+                      onChange={(e) => handleImageUpload(e, 'enclosure')}
+                      className="hidden"
+                      id="enclosure-images"
+                    />
+                    <Button
+                      type="button"
+                      variant="outline"
+                      onClick={() => document.getElementById('enclosure-images')?.click()}
+                      className="w-full"
+                    >
+                      <Upload className="w-4 h-4 mr-2" />
+                      {language === 'en' ? 'Upload Enclosure Photos' : 'बाड़े की फोटो अपलोड करें'}
+                    </Button>
+                  </div>
+                  {enclosureImages.length > 0 && (
+                    <div className="grid grid-cols-3 gap-2">
+                      {enclosureImages.map((img, idx) => (
+                        <div key={idx} className="relative group">
+                          <img
+                            src={URL.createObjectURL(img)}
+                            alt={`Enclosure ${idx + 1}`}
+                            className="w-full h-20 object-cover rounded-lg"
+                          />
+                          <button
+                            onClick={() => removeImage(idx, 'enclosure')}
+                            className="absolute -top-1 -right-1 bg-red-500 text-white rounded-full p-1 opacity-0 group-hover:opacity-100 transition-opacity"
+                          >
+                            <X className="w-3 h-3" />
+                          </button>
+                        </div>
+                      ))}
+                    </div>
+                  )}
+                </div>
+              </Card>
+            </motion.div>
+
+            {isEmergency && (
+              <motion.div
+                initial={{ opacity: 0, y: 20 }}
+                animate={{ opacity: 1, y: 0 }}
+                transition={{ delay: 0.4 }}
+              >
+                <Card className="p-6 bg-red-50 dark:bg-red-900/20 border-2 border-red-200 dark:border-red-800">
+                  <Label className="text-red-900 dark:text-red-100 mb-3 flex items-center gap-2">
+                    <Video className="w-5 h-5" />
+                    {language === 'en' ? 'Emergency Video (Optional)' : 'आपातकालीन वीडियो (वैकल्पिक)'}
+                  </Label>
+                  <div className="space-y-3">
+                    <div className="flex items-center gap-2">
+                      <Input
+                        type="file"
+                        accept="video/*"
+                        onChange={handleVideoUpload}
+                        className="hidden"
+                        id="emergency-video"
+                      />
+                      <Button
+                        type="button"
+                        variant="outline"
+                        onClick={() => document.getElementById('emergency-video')?.click()}
+                        className="w-full border-red-300 hover:bg-red-50"
+                      >
+                        <Upload className="w-4 h-4 mr-2" />
+                        {language === 'en' ? 'Upload Emergency Video' : 'आपातकालीन वीडियो अपलोड करें'}
+                      </Button>
+                    </div>
+                    {emergencyVideo && (
+                      <div className="bg-white dark:bg-gray-800 p-3 rounded-lg flex items-center justify-between">
+                        <div className="flex items-center gap-2">
+                          <Video className="w-4 h-4 text-red-600" />
+                          <span className="text-sm font-medium">{emergencyVideo.name}</span>
+                        </div>
+                        <button
+                          onClick={() => setEmergencyVideo(null)}
+                          className="text-red-600 hover:text-red-700"
+                        >
+                          <X className="w-4 h-4" />
+                        </button>
+                      </div>
+                    )}
+                  </div>
+                </Card>
+              </motion.div>
+            )}
+
+            <motion.div
+              initial={{ opacity: 0, y: 20 }}
+              animate={{ opacity: 1, y: 0 }}
+              transition={{ delay: 0.45 }}
             >
               <Button
                 onClick={handleProcessInput}
-                disabled={isProcessing || !hasRecording}
+                disabled={isProcessing || (inputMethod === 'audio' && !hasRecording) || (inputMethod === 'text' && !textInput.trim())}
                 className="w-full h-14 bg-gradient-to-r from-green-600 to-green-700 hover:from-green-700 hover:to-green-800 text-white font-medium"
               >
                 {isProcessing ? (
@@ -430,76 +708,173 @@ export function DailyLogEntry() {
             className="space-y-4"
           >
             <Card className="p-6 bg-gradient-to-r from-green-50 to-emerald-50 dark:from-gray-800 dark:to-gray-700 border-2 border-green-200">
-              <div className="flex items-center gap-2 mb-4">
-                <Sparkles className="w-6 h-6 text-green-600" />
-                <h2 className="text-xl font-bold text-green-900 dark:text-green-100">
-                  {language === 'en' ? 'AI Generated Form' : 'AI जनरेटेड फॉर्म'}
-                </h2>
+              <div className="flex items-center justify-between mb-4">
+                <div className="flex items-center gap-2">
+                  <Sparkles className="w-6 h-6 text-green-600" />
+                  <h2 className="text-xl font-bold text-green-900 dark:text-green-100">
+                    {language === 'en' ? 'AI Generated Form' : 'AI जनरेटेड फॉर्म'}
+                  </h2>
+                </div>
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={() => setIsEditMode(!isEditMode)}
+                  className="flex items-center gap-1"
+                >
+                  <Edit2 className="w-4 h-4" />
+                  {isEditMode 
+                    ? (language === 'en' ? 'View' : 'देखें')
+                    : (language === 'en' ? 'Edit' : 'संपादित करें')
+                  }
+                </Button>
               </div>
               
               <div className="space-y-4 bg-white dark:bg-gray-800 p-4 rounded-lg">
                 <div>
-                  <Label className="text-sm font-medium">{language === 'en' ? 'Animal' : 'जानवर'}</Label>
-                  <p className="text-base">{animalName}</p>
+                  <Label className="text-sm font-medium mb-1 block">{language === 'en' ? 'Animal' : 'जानवर'}</Label>
+                  <p className="text-base font-medium text-green-700 dark:text-green-400">{animalName}</p>
                 </div>
 
                 <div>
-                  <Label className="text-sm font-medium">{language === 'en' ? 'Date' : 'तारीख'}</Label>
-                  <p className="text-base">{formData.date_or_day}</p>
+                  <Label className="text-sm font-medium mb-1 block">{language === 'en' ? 'Date' : 'तारीख'}</Label>
+                  {isEditMode ? (
+                    <Input
+                      type="text"
+                      value={formData.date_or_day}
+                      onChange={(e) => updateFormField('date_or_day', e.target.value)}
+                    />
+                  ) : (
+                    <p className="text-base">{formData.date_or_day}</p>
+                  )}
                 </div>
 
                 <div className="flex items-center gap-2">
-                  <Checkbox checked={formData.animal_observed_on_time} />
+                  <Checkbox 
+                    checked={formData.animal_observed_on_time}
+                    onCheckedChange={(checked: boolean) => isEditMode && updateFormField('animal_observed_on_time', checked)}
+                    disabled={!isEditMode}
+                  />
                   <Label>{language === 'en' ? 'Animal observed on time' : 'समय पर जानवर देखा गया'}</Label>
                 </div>
 
                 <div className="flex items-center gap-2">
-                  <Checkbox checked={formData.clean_drinking_water_provided} />
+                  <Checkbox 
+                    checked={formData.clean_drinking_water_provided}
+                    onCheckedChange={(checked: boolean) => isEditMode && updateFormField('clean_drinking_water_provided', checked)}
+                    disabled={!isEditMode}
+                  />
                   <Label>{language === 'en' ? 'Clean drinking water provided' : 'स्वच्छ पेयजल प्रदान किया गया'}</Label>
                 </div>
 
                 <div className="flex items-center gap-2">
-                  <Checkbox checked={formData.enclosure_cleaned_properly} />
+                  <Checkbox 
+                    checked={formData.enclosure_cleaned_properly}
+                    onCheckedChange={(checked: boolean) => isEditMode && updateFormField('enclosure_cleaned_properly', checked)}
+                    disabled={!isEditMode}
+                  />
                   <Label>{language === 'en' ? 'Enclosure cleaned properly' : 'बाड़ा ठीक से साफ किया गया'}</Label>
                 </div>
 
                 <div className="flex items-center gap-2">
-                  <Checkbox checked={formData.normal_behaviour_status} />
+                  <Checkbox 
+                    checked={formData.normal_behaviour_status}
+                    onCheckedChange={(checked: boolean) => isEditMode && updateFormField('normal_behaviour_status', checked)}
+                    disabled={!isEditMode}
+                  />
                   <Label>{language === 'en' ? 'Normal behaviour observed' : 'सामान्य व्यवहार देखा गया'}</Label>
                 </div>
 
-                {formData.normal_behaviour_details && (
-                  <div>
-                    <Label className="text-sm font-medium">{language === 'en' ? 'Behaviour Details' : 'व्यवहार विवरण'}</Label>
+                <div>
+                  <Label className="text-sm font-medium mb-1 block">{language === 'en' ? 'Behaviour Details' : 'व्यवहार विवरण'}</Label>
+                  {isEditMode ? (
+                    <Textarea
+                      value={formData.normal_behaviour_details}
+                      onChange={(e) => updateFormField('normal_behaviour_details', e.target.value)}
+                      rows={3}
+                      className="w-full"
+                    />
+                  ) : (
                     <p className="text-sm text-gray-700 dark:text-gray-300 bg-gray-50 dark:bg-gray-700 p-3 rounded">
                       {formData.normal_behaviour_details}
                     </p>
-                  </div>
-                )}
+                  )}
+                </div>
 
                 <div className="flex items-center gap-2">
-                  <Checkbox checked={formData.feed_and_supplements_available} />
+                  <Checkbox 
+                    checked={formData.feed_and_supplements_available}
+                    onCheckedChange={(checked: boolean) => isEditMode && updateFormField('feed_and_supplements_available', checked)}
+                    disabled={!isEditMode}
+                  />
                   <Label>{language === 'en' ? 'Feed and supplements available' : 'चारा और सप्लीमेंट उपलब्ध'}</Label>
                 </div>
 
                 <div className="flex items-center gap-2">
-                  <Checkbox checked={formData.feed_given_as_prescribed} />
+                  <Checkbox 
+                    checked={formData.feed_given_as_prescribed}
+                    onCheckedChange={(checked: boolean) => isEditMode && updateFormField('feed_given_as_prescribed', checked)}
+                    disabled={!isEditMode}
+                  />
                   <Label>{language === 'en' ? 'Feed given as prescribed' : 'निर्धारित अनुसार चारा दिया गया'}</Label>
                 </div>
 
-                {formData.other_animal_requirements && (
-                  <div>
-                    <Label className="text-sm font-medium">{language === 'en' ? 'Other Requirements' : 'अन्य आवश्यकताएं'}</Label>
+                <div>
+                  <Label className="text-sm font-medium mb-1 block">{language === 'en' ? 'Other Requirements' : 'अन्य आवश्यकताएं'}</Label>
+                  {isEditMode ? (
+                    <Textarea
+                      value={formData.other_animal_requirements}
+                      onChange={(e) => updateFormField('other_animal_requirements', e.target.value)}
+                      rows={2}
+                      className="w-full"
+                      placeholder={language === 'en' ? 'Any special needs...' : 'कोई विशेष आवश्यकता...'}
+                    />
+                  ) : formData.other_animal_requirements ? (
                     <p className="text-sm text-gray-700 dark:text-gray-300 bg-gray-50 dark:bg-gray-700 p-3 rounded">
                       {formData.other_animal_requirements}
                     </p>
-                  </div>
-                )}
+                  ) : (
+                    <p className="text-sm text-gray-500 italic">{language === 'en' ? 'None' : 'कोई नहीं'}</p>
+                  )}
+                </div>
 
                 <div>
-                  <Label className="text-sm font-medium">{language === 'en' ? 'Incharge Signature' : 'प्रभारी के हस्ताक्षर'}</Label>
-                  <p className="text-base">{formData.incharge_signature}</p>
+                  <Label className="text-sm font-medium mb-1 block">{language === 'en' ? 'Incharge Signature' : 'प्रभारी के हस्ताक्षर'}</Label>
+                  {isEditMode ? (
+                    <Input
+                      type="text"
+                      value={formData.incharge_signature}
+                      onChange={(e) => updateFormField('incharge_signature', e.target.value)}
+                    />
+                  ) : (
+                    <p className="text-base font-medium">{formData.incharge_signature}</p>
+                  )}
                 </div>
+
+                {(animalImages.length > 0 || enclosureImages.length > 0 || emergencyVideo) && (
+                  <div className="border-t pt-4 mt-4">
+                    <Label className="text-sm font-medium mb-2 block">{language === 'en' ? 'Attachments' : 'संलग्नक'}</Label>
+                    <div className="space-y-2 text-sm">
+                      {animalImages.length > 0 && (
+                        <p className="flex items-center gap-2">
+                          <ImageIcon className="w-4 h-4 text-green-600" />
+                          {animalImages.length} {language === 'en' ? 'animal photo(s)' : 'जानवर की फोटो'}
+                        </p>
+                      )}
+                      {enclosureImages.length > 0 && (
+                        <p className="flex items-center gap-2">
+                          <Lock className="w-4 h-4 text-green-600" />
+                          {enclosureImages.length} {language === 'en' ? 'enclosure photo(s)' : 'बाड़े की फोटो'}
+                        </p>
+                      )}
+                      {emergencyVideo && (
+                        <p className="flex items-center gap-2 text-red-600">
+                          <Video className="w-4 h-4" />
+                          {language === 'en' ? '1 emergency video' : '1 आपातकालीन वीडियो'}
+                        </p>
+                      )}
+                    </div>
+                  </div>
+                )}
               </div>
 
               <div className="mt-6 space-y-3">
