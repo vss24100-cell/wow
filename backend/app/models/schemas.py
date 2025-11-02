@@ -86,6 +86,22 @@ class Observation(BaseModel):
     is_emergency: bool = False
     created_at: Optional[datetime] = None
 
+class FormData(BaseModel):
+    date_or_day: str
+    animal_observed_on_time: bool
+    clean_drinking_water_provided: bool
+    enclosure_cleaned_properly: bool
+    normal_behaviour_status: bool
+    normal_behaviour_details: str
+    feed_and_supplements_available: bool
+    feed_given_as_prescribed: bool
+    other_animal_requirements: str
+    incharge_signature: str
+    daily_animal_health_monitoring: str
+    carnivorous_animal_feeding_chart: str
+    medicine_stock_register: str
+    daily_wildlife_monitoring: str
+
 class ObservationCreate(BaseModel):
     animal_name: str
     audio_text: Optional[str] = None
@@ -94,6 +110,7 @@ class ObservationCreate(BaseModel):
     has_animal_images: bool = False
     has_enclosure_images: bool = False
     has_emergency_video: bool = False
+    form_data: Optional[FormData] = None
 
 class AudioTranscription(BaseModel):
     audio_file: bytes

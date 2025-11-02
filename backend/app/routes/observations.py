@@ -17,32 +17,62 @@ async def get_observations(animal_id: Optional[str] = None):
 async def create_observation(observation_data: ObservationCreate):
     animal_id = str(uuid.uuid4())
     
-    structured_data = zoo_model.process_observation(
-        observation_data.audio_text or "",
-        observation_data.date
-    )
-    
-    new_observation = {
-        "id": str(uuid.uuid4()),
-        "animal_id": animal_id,
-        "zookeeper_id": "demo-user",
-        "date_or_day": structured_data.date_or_day,
-        "animal_observed_on_time": structured_data.animal_observed_on_time,
-        "clean_drinking_water_provided": structured_data.clean_drinking_water_provided,
-        "enclosure_cleaned_properly": structured_data.enclosure_cleaned_properly,
-        "normal_behaviour_status": structured_data.normal_behaviour_status,
-        "normal_behaviour_details": structured_data.normal_behaviour_details,
-        "feed_and_supplements_available": structured_data.feed_and_supplements_available,
-        "feed_given_as_prescribed": structured_data.feed_given_as_prescribed,
-        "other_animal_requirements": structured_data.other_animal_requirements,
-        "incharge_signature": structured_data.incharge_signature,
-        "daily_animal_health_monitoring": structured_data.daily_animal_health_monitoring,
-        "carnivorous_animal_feeding_chart": structured_data.carnivorous_animal_feeding_chart,
-        "medicine_stock_register": structured_data.medicine_stock_register,
-        "daily_wildlife_monitoring": structured_data.daily_wildlife_monitoring,
-        "is_emergency": observation_data.is_emergency,
-        "created_at": datetime.utcnow().isoformat()
-    }
+    if observation_data.form_data:
+        form_data = observation_data.form_data
+        new_observation = {
+            "id": str(uuid.uuid4()),
+            "animal_id": animal_id,
+            "zookeeper_id": "demo-user",
+            "date_or_day": form_data.date_or_day,
+            "animal_observed_on_time": form_data.animal_observed_on_time,
+            "clean_drinking_water_provided": form_data.clean_drinking_water_provided,
+            "enclosure_cleaned_properly": form_data.enclosure_cleaned_properly,
+            "normal_behaviour_status": form_data.normal_behaviour_status,
+            "normal_behaviour_details": form_data.normal_behaviour_details,
+            "feed_and_supplements_available": form_data.feed_and_supplements_available,
+            "feed_given_as_prescribed": form_data.feed_given_as_prescribed,
+            "other_animal_requirements": form_data.other_animal_requirements,
+            "incharge_signature": form_data.incharge_signature,
+            "daily_animal_health_monitoring": form_data.daily_animal_health_monitoring,
+            "carnivorous_animal_feeding_chart": form_data.carnivorous_animal_feeding_chart,
+            "medicine_stock_register": form_data.medicine_stock_register,
+            "daily_wildlife_monitoring": form_data.daily_wildlife_monitoring,
+            "is_emergency": observation_data.is_emergency,
+            "has_animal_images": observation_data.has_animal_images,
+            "has_enclosure_images": observation_data.has_enclosure_images,
+            "has_emergency_video": observation_data.has_emergency_video,
+            "created_at": datetime.utcnow().isoformat()
+        }
+    else:
+        structured_data = zoo_model.process_observation(
+            observation_data.audio_text or "",
+            observation_data.date
+        )
+        
+        new_observation = {
+            "id": str(uuid.uuid4()),
+            "animal_id": animal_id,
+            "zookeeper_id": "demo-user",
+            "date_or_day": structured_data.date_or_day,
+            "animal_observed_on_time": structured_data.animal_observed_on_time,
+            "clean_drinking_water_provided": structured_data.clean_drinking_water_provided,
+            "enclosure_cleaned_properly": structured_data.enclosure_cleaned_properly,
+            "normal_behaviour_status": structured_data.normal_behaviour_status,
+            "normal_behaviour_details": structured_data.normal_behaviour_details,
+            "feed_and_supplements_available": structured_data.feed_and_supplements_available,
+            "feed_given_as_prescribed": structured_data.feed_given_as_prescribed,
+            "other_animal_requirements": structured_data.other_animal_requirements,
+            "incharge_signature": structured_data.incharge_signature,
+            "daily_animal_health_monitoring": structured_data.daily_animal_health_monitoring,
+            "carnivorous_animal_feeding_chart": structured_data.carnivorous_animal_feeding_chart,
+            "medicine_stock_register": structured_data.medicine_stock_register,
+            "daily_wildlife_monitoring": structured_data.daily_wildlife_monitoring,
+            "is_emergency": observation_data.is_emergency,
+            "has_animal_images": observation_data.has_animal_images,
+            "has_enclosure_images": observation_data.has_enclosure_images,
+            "has_emergency_video": observation_data.has_emergency_video,
+            "created_at": datetime.utcnow().isoformat()
+        }
     
     return new_observation
 

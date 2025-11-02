@@ -293,6 +293,7 @@ export function DailyLogEntry() {
         has_animal_images: animalImages.length > 0,
         has_enclosure_images: enclosureImages.length > 0,
         has_emergency_video: emergencyVideo !== null,
+        form_data: formData,
       };
 
       await api.createObservation(observationData);
