@@ -33,7 +33,7 @@ export function ZookeeperDashboard() {
   }, [currentUser]);
 
   const handleAudioLog = () => {
-    setCurrentScreen('dailyLog');
+    setCurrentScreen('daily-log');
   };
 
   const handleHistory = () => {
