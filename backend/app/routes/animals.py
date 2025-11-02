@@ -41,10 +41,12 @@ async def create_animal(animal_data: AnimalCreate, current_user: dict = Depends(
         "id": str(uuid.uuid4()),
         "name": animal_data.name,
         "species": animal_data.species,
-        "number": animal_data.number,
+        "number": animal_data.number or "",
+        "age": animal_data.age or "",
+        "enclosure": animal_data.enclosure or "",
         "health": "good",
         "last_checked": datetime.utcnow().isoformat(),
-        "assigned_to": animal_data.assigned_to,
+        "assigned_to": animal_data.assigned_to or current_user["id"],
         "created_at": datetime.utcnow().isoformat()
     }
     

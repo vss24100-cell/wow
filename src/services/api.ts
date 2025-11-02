@@ -18,7 +18,10 @@ export const api = {
     const response = await fetch(`${API_URL}/api/animals/`, {
       headers: getAuthHeaders()
     });
-    if (!response.ok) throw new Error('Failed to fetch animals');
+    if (!response.ok) {
+      const errorText = await response.text().catch(() => '');
+      throw new Error(`${response.status}: Failed to fetch animals - ${errorText}`);
+    }
     return response.json();
   },
 
@@ -27,6 +30,19 @@ export const api = {
       headers: getAuthHeaders()
     });
     if (!response.ok) throw new Error('Failed to fetch animal');
+    return response.json();
+  },
+
+  async createAnimal(data: { name: string; species: string; age: string; enclosure: string }) {
+    const response = await fetch(`${API_URL}/api/animals/`, {
+      method: 'POST',
+      headers: getAuthHeaders(),
+      body: JSON.stringify(data)
+    });
+    if (!response.ok) {
+      const errorText = await response.text();
+      throw new Error(`${response.status}: ${errorText}`);
+    }
     return response.json();
   },
 
@@ -39,7 +55,10 @@ export const api = {
     const response = await fetch(url, {
       headers: getAuthHeaders()
     });
-    if (!response.ok) throw new Error('Failed to fetch observations');
+    if (!response.ok) {
+      const errorText = await response.text().catch(() => '');
+      throw new Error(`${response.status}: Failed to fetch observations - ${errorText}`);
+    }
     return response.json();
   },
 
@@ -99,7 +118,10 @@ export const api = {
     const response = await fetch(`${API_URL}/api/users/`, {
       headers: getAuthHeaders()
     });
-    if (!response.ok) throw new Error('Failed to fetch users');
+    if (!response.ok) {
+      const errorText = await response.text().catch(() => '');
+      throw new Error(`${response.status}: Failed to fetch users - ${errorText}`);
+    }
     return response.json();
   }
 };

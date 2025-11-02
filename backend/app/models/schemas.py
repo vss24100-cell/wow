@@ -46,6 +46,8 @@ class Animal(BaseModel):
     name: str
     species: str
     number: Optional[str] = None
+    age: Optional[str] = None
+    enclosure: Optional[str] = None
     image_url: Optional[str] = None
     health: HealthStatus
     last_checked: datetime
@@ -59,6 +61,8 @@ class AnimalCreate(BaseModel):
     name: str
     species: str
     number: Optional[str] = None
+    age: Optional[str] = None
+    enclosure: Optional[str] = None
     assigned_to: Optional[str] = None
 
 class Observation(BaseModel):
