@@ -1,35 +1,48 @@
-import React, { useContext, useState } from 'react';
+import { useContext, useState, useEffect } from 'react';
 import { AppContext } from '../App';
-import { mockAnimals, translations } from './mockData';
-import { AlertCircle, Bell, Plus, Search, Menu, AlertTriangle, Calendar, History, Mic } from 'lucide-react';
+import { translations } from '../i18n/translations';
+import { AlertCircle, Bell, Menu, AlertTriangle, History, Mic } from 'lucide-react';
 import { motion } from 'motion/react';
 import { Button } from './ui/button';
 import { Card } from './ui/card';
-import { Input } from './ui/input';
-import { Badge } from './ui/badge';
-import { AnimalCard } from './AnimalCard';
 import { TaskWidget } from './TaskWidget';
-import { ImageWithFallback } from './figma/ImageWithFallback';
+import { api } from '../services/api';
+import { toast } from 'sonner';
 
 export function ZookeeperDashboard() {
-  const { currentUser, language, setCurrentScreen, setSelectedAnimal, setShowSOS } = useContext(AppContext);
-  const [searchQuery, setSearchQuery] = useState('');
+  const { currentUser, language, setCurrentScreen, setShowSOS } = useContext(AppContext);
+  const [notifications, setNotifications] = useState(0);
   const t = translations[language];
 
-  const myAnimals = mockAnimals.filter(
-    (animal) => animal.assignedTo === currentUser?.name
-  );
+  useEffect(() => {
+    const fetchNotifications = async () => {
+      try {
+        const observations = await api.getObservations();
+        const emergencyCount = observations.filter((obs: any) => obs.is_emergency).length;
+        setNotifications(emergencyCount);
+      } catch (error) {
+        console.error('Failed to fetch notifications:', error);
+      }
+    };
+    
+    if (currentUser) {
+      fetchNotifications();
+      const interval = setInterval(fetchNotifications, 60000);
+      return () => clearInterval(interval);
+    }
+  }, [currentUser]);
 
-  const filteredAnimals = myAnimals.filter(
-    (animal) =>
-      animal.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
-      animal.species.toLowerCase().includes(searchQuery.toLowerCase()) ||
-      animal.id.includes(searchQuery)
-  );
+  const handleAudioLog = () => {
+    setCurrentScreen('dailyLog');
+  };
 
-  const pendingAnimals = myAnimals.filter(
-    (animal) => animal.lastChecked.includes('day') || animal.lastChecked.includes('hours')
-  );
+  const handleHistory = () => {
+    setCurrentScreen('logHistory');
+  };
+
+  const handleNotifications = () => {
+    toast.info(language === 'en' ? 'Notifications feature coming soon' : 'सूचना सुविधा जल्द आ रही है');
+  };
 
   return (
     <motion.div 
@@ -51,6 +64,7 @@ export function ZookeeperDashboard() {
               variant="ghost"
               size="icon"
               className="text-white hover:bg-white/20"
+              onClick={() => setCurrentScreen('settings')}
             >
               <Menu className="w-6 h-6" />
             </Button>
@@ -70,45 +84,32 @@ export function ZookeeperDashboard() {
                 variant="ghost"
                 size="icon"
                 className="text-white hover:bg-white/20 relative"
+                onClick={handleNotifications}
               >
                 <Bell className="w-5 h-5" />
-                <motion.span 
-                  initial={{ scale: 0 }}
-                  animate={{ scale: 1 }}
-                  transition={{ 
-                    delay: 0.5,
-                    type: "spring",
-                    stiffness: 500,
-                    damping: 10
-                  }}
-                  className="absolute top-1 right-1 w-2 h-2 bg-red-500 rounded-full"
-                >
-                  <motion.span
-                    animate={{ scale: [1, 1.5, 1] }}
-                    transition={{ repeat: Infinity, duration: 2 }}
-                    className="absolute inset-0 bg-red-500 rounded-full opacity-75"
-                  />
-                </motion.span>
+                {notifications > 0 && (
+                  <motion.span 
+                    initial={{ scale: 0 }}
+                    animate={{ scale: 1 }}
+                    transition={{ 
+                      delay: 0.5,
+                      type: "spring",
+                      stiffness: 500,
+                      damping: 10
+                    }}
+                    className="absolute top-1 right-1 w-2 h-2 bg-red-500 rounded-full"
+                  >
+                    <motion.span
+                      animate={{ scale: [1, 1.5, 1] }}
+                      transition={{ repeat: Infinity, duration: 2 }}
+                      className="absolute inset-0 bg-red-500 rounded-full opacity-75"
+                    />
+                  </motion.span>
+                )}
               </Button>
             </motion.div>
           </div>
         </div>
-
-        {/* Search Bar */}
-        <motion.div 
-          initial={{ opacity: 0, y: 10 }}
-          animate={{ opacity: 1, y: 0 }}
-          transition={{ delay: 0.2 }}
-          className="relative"
-        >
-          <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-5 h-5 text-gray-400" />
-          <Input
-            placeholder={language === 'en' ? 'Search animals by name, ID, or type...' : 'नाम, आईडी या प्रकार से खोजें...'}
-            value={searchQuery}
-            onChange={(e) => setSearchQuery(e.target.value)}
-            className="pl-10 bg-white/95 border-0 h-12 rounded-xl shadow-sm transition-all duration-300 focus:shadow-lg focus:bg-white"
-          />
-        </motion.div>
       </motion.div>
 
       <div className="p-6 space-y-6">
@@ -118,7 +119,7 @@ export function ZookeeperDashboard() {
           animate={{ opacity: 1, y: 0 }}
           transition={{ delay: 0.3 }}
         >
-          <TaskWidget tasks={pendingAnimals.length} />
+          <TaskWidget tasks={0} />
         </motion.div>
 
         {/* Quick Actions */}
@@ -143,14 +144,7 @@ export function ZookeeperDashboard() {
                 transition={{ type: "spring", stiffness: 400, damping: 17 }}
               >
                 <Button
-                  onClick={() => {
-                    if (myAnimals.length > 0) {
-                      setSelectedAnimal(myAnimals[0]);
-                      setCurrentScreen('dailyLog');
-                    } else {
-                      // toast.error implementation would go here
-                    }
-                  }}
+                  onClick={handleAudioLog}
                   variant="outline"
                   className="w-full h-20 flex flex-col gap-2 border-purple-300 hover:bg-purple-50 dark:hover:bg-purple-900/20 transition-all duration-300 hover:shadow-lg"
                 >
@@ -164,7 +158,7 @@ export function ZookeeperDashboard() {
                 transition={{ type: "spring", stiffness: 400, damping: 17 }}
               >
                 <Button
-                  onClick={() => setCurrentScreen('logHistory')}
+                  onClick={handleHistory}
                   variant="outline"
                   className="w-full h-20 flex flex-col gap-2 border-green-300 hover:bg-green-50 dark:hover:bg-green-900/20 transition-all duration-300 hover:shadow-lg"
                 >
@@ -194,36 +188,6 @@ export function ZookeeperDashboard() {
             </div>
           </Card>
         </motion.div>
-
-        {/* My Animals Section */}
-        <div>
-          <div className="flex items-center justify-between mb-4">
-            <h2 className="text-green-900 dark:text-green-100">
-              {t.myAnimals} ({filteredAnimals.length})
-            </h2>
-          </div>
-
-          <div className="space-y-3">
-            {filteredAnimals.map((animal, index) => (
-              <motion.div
-                key={animal.id}
-                initial={{ opacity: 0, y: 20 }}
-                animate={{ opacity: 1, y: 0 }}
-                transition={{ delay: index * 0.05 }}
-              >
-                <AnimalCard animal={animal} />
-              </motion.div>
-            ))}
-          </div>
-
-          {filteredAnimals.length === 0 && (
-            <Card className="p-8 text-center bg-white/50">
-              <p className="text-gray-500">
-                {language === 'en' ? 'No animals found' : 'कोई जानवर नहीं मिला'}
-              </p>
-            </Card>
-          )}
-        </div>
       </div>
 
       {/* Floating SOS Button */}
