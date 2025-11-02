@@ -1,13 +1,12 @@
 import { useContext, useState, useRef, useEffect } from 'react';
 import { AppContext } from '../App';
 import { translations } from './mockData';
-import { ArrowLeft, Mic, Square, Loader2, Sparkles, Calendar as CalendarIcon, FileText } from 'lucide-react';
+import { ArrowLeft, Mic, Square, Loader2, Sparkles, Calendar as CalendarIcon } from 'lucide-react';
 import { motion } from 'motion/react';
 import { Button } from './ui/button';
 import { Card } from './ui/card';
 import { Label } from './ui/label';
 import { Input } from './ui/input';
-import { Textarea } from './ui/textarea';
 import { Checkbox } from './ui/checkbox';
 import { toast } from 'sonner';
 import { api } from '../services/api';
@@ -35,8 +34,6 @@ export function DailyLogEntry() {
 
   const [animalName, setAnimalName] = useState<string>('');
   const [selectedDate, setSelectedDate] = useState<string>(new Date().toISOString().split('T')[0]);
-  const [inputMode, setInputMode] = useState<'audio' | 'text'>('text');
-  const [textInput, setTextInput] = useState('');
 
   const [isRecording, setIsRecording] = useState(false);
   const [recordingTime, setRecordingTime] = useState(0);
@@ -189,13 +186,8 @@ export function DailyLogEntry() {
       return;
     }
 
-    if (inputMode === 'audio' && !audioBlob) {
+    if (!audioBlob) {
       toast.error(language === 'en' ? 'No audio recorded' : 'कोई ऑडियो रिकॉर्ड नहीं हुआ');
-      return;
-    }
-
-    if (inputMode === 'text' && !textInput.trim()) {
-      toast.error(language === 'en' ? 'Please enter observation text' : 'कृपया अवलोकन टेक्स्ट दर्ज करें');
       return;
     }
 
@@ -203,15 +195,9 @@ export function DailyLogEntry() {
     toast.info(language === 'en' ? 'Processing with AI...' : 'AI के साथ प्रोसेस हो रहा है...');
 
     try {
-      let transcript = '';
-
-      if (inputMode === 'audio' && audioBlob) {
-        const transcribeResult = await api.transcribeAudio(audioBlob, language === 'hi' ? 'hi' : 'en');
-        transcript = transcribeResult.transcript;
-        toast.success(language === 'en' ? 'Audio transcribed!' : 'ऑडियो ट्रांसक्राइब हो गया!');
-      } else {
-        transcript = textInput;
-      }
+      const transcribeResult = await api.transcribeAudio(audioBlob, language === 'hi' ? 'hi' : 'en');
+      const transcript = transcribeResult.transcript;
+      toast.success(language === 'en' ? 'Audio transcribed!' : 'ऑडियो ट्रांसक्राइब हो गया!');
 
       setProcessedTranscript(transcript);
 
@@ -353,99 +339,63 @@ export function DailyLogEntry() {
               transition={{ delay: 0.3 }}
             >
               <Card className="p-6 bg-white dark:bg-gray-800">
-                <div className="flex gap-3 mb-4">
-                  <Button
-                    onClick={() => setInputMode('text')}
-                    variant={inputMode === 'text' ? 'default' : 'outline'}
-                    className="flex-1"
-                  >
-                    <FileText className="w-4 h-4 mr-2" />
-                    {language === 'en' ? 'Text' : 'टेक्स्ट'}
-                  </Button>
-                  <Button
-                    onClick={() => setInputMode('audio')}
-                    variant={inputMode === 'audio' ? 'default' : 'outline'}
-                    className="flex-1"
-                  >
-                    <Mic className="w-4 h-4 mr-2" />
-                    {language === 'en' ? 'Audio' : 'ऑडियो'}
-                  </Button>
-                </div>
-
-                {inputMode === 'text' ? (
-                  <div className="space-y-3">
-                    <Label className="text-green-900 dark:text-green-100">
-                      {language === 'en' ? 'Enter observation details' : 'अवलोकन विवरण दर्ज करें'}
-                    </Label>
-                    <Textarea
-                      value={textInput}
-                      onChange={(e) => setTextInput(e.target.value)}
-                      placeholder={language === 'en' 
-                        ? 'Describe the animal\'s behavior, health, feeding, etc...' 
-                        : 'जानवर के व्यवहार, स्वास्थ्य, भोजन आदि का वर्णन करें...'}
-                      rows={6}
-                      className="w-full"
-                    />
+                <div className="space-y-4">
+                  <div className="bg-blue-50 dark:bg-blue-900/20 border border-blue-200 dark:border-blue-800 rounded-lg p-3 mb-4">
+                    <p className="text-sm text-blue-800 dark:text-blue-200">
+                      {language === 'en' 
+                        ? '🎤 Tip: Click the microphone button below to start recording. Your browser will ask for microphone permission - please allow it to use audio recording.' 
+                        : '🎤 सुझाव: रिकॉर्डिंग शुरू करने के लिए नीचे माइक्रोफ़ोन बटन पर क्लिक करें। आपका ब्राउज़र माइक्रोफ़ोन अनुमति मांगेगा - कृपया इसे ऑडियो रिकॉर्डिंग के लिए अनुमति दें।'}
+                    </p>
                   </div>
-                ) : (
-                  <div className="space-y-4">
-                    <div className="bg-blue-50 dark:bg-blue-900/20 border border-blue-200 dark:border-blue-800 rounded-lg p-3 mb-4">
-                      <p className="text-sm text-blue-800 dark:text-blue-200">
-                        {language === 'en' 
-                          ? '🎤 Tip: Click the microphone button below to start recording. Your browser will ask for microphone permission - please allow it to use audio recording.' 
-                          : '🎤 सुझाव: रिकॉर्डिंग शुरू करने के लिए नीचे माइक्रोफ़ोन बटन पर क्लिक करें। आपका ब्राउज़र माइक्रोफ़ोन अनुमति मांगेगा - कृपया इसे ऑडियो रिकॉर्डिंग के लिए अनुमति दें।'}
-                      </p>
-                    </div>
-                    <div className="flex flex-col items-center gap-4">
-                      {!hasRecording ? (
-                        <>
-                          <div className="text-center">
-                            <motion.button
-                              whileHover={{ scale: 1.05 }}
-                              whileTap={{ scale: 0.95 }}
-                              onClick={isRecording ? handleStopRecording : handleStartRecording}
-                              className={`w-20 h-20 rounded-full flex items-center justify-center shadow-lg ${
-                                isRecording 
-                                  ? 'bg-red-500 hover:bg-red-600' 
-                                  : 'bg-green-600 hover:bg-green-700'
-                              }`}
-                            >
-                              {isRecording ? (
-                                <Square className="w-8 h-8 text-white" />
-                              ) : (
-                                <Mic className="w-8 h-8 text-white" />
-                              )}
-                            </motion.button>
-                          </div>
-                          {isRecording && (
-                            <div className="text-center">
-                              <p className="text-2xl font-mono text-red-600">{formatTime(recordingTime)}</p>
-                              <p className="text-sm text-gray-600 dark:text-gray-400">
-                                {language === 'en' ? 'Recording in progress...' : 'रिकॉर्डिंग चल रही है...'}
-                              </p>
-                            </div>
-                          )}
-                        </>
-                      ) : (
-                        <div className="text-center space-y-3">
-                          <p className="text-green-600 font-medium">
-                            ✓ {language === 'en' ? 'Recording completed' : 'रिकॉर्डिंग पूर्ण'}
-                          </p>
-                          <p className="text-sm text-gray-600">
-                            {language === 'en' ? 'Duration:' : 'अवधि:'} {formatTime(recordingTime)}
-                          </p>
-                          <Button variant="outline" onClick={() => {
-                            setHasRecording(false);
-                            setAudioBlob(null);
-                            setRecordingTime(0);
-                          }}>
-                            {language === 'en' ? 'Record Again' : 'फिर से रिकॉर्ड करें'}
-                          </Button>
+                  <div className="flex flex-col items-center gap-4">
+                    {!hasRecording ? (
+                      <>
+                        <div className="text-center">
+                          <motion.button
+                            whileHover={{ scale: 1.05 }}
+                            whileTap={{ scale: 0.95 }}
+                            onClick={isRecording ? handleStopRecording : handleStartRecording}
+                            className={`w-20 h-20 rounded-full flex items-center justify-center shadow-lg ${
+                              isRecording 
+                                ? 'bg-red-500 hover:bg-red-600' 
+                                : 'bg-green-600 hover:bg-green-700'
+                            }`}
+                          >
+                            {isRecording ? (
+                              <Square className="w-8 h-8 text-white" />
+                            ) : (
+                              <Mic className="w-8 h-8 text-white" />
+                            )}
+                          </motion.button>
                         </div>
-                      )}
-                    </div>
+                        {isRecording && (
+                          <div className="text-center">
+                            <p className="text-2xl font-mono text-red-600">{formatTime(recordingTime)}</p>
+                            <p className="text-sm text-gray-600 dark:text-gray-400">
+                              {language === 'en' ? 'Recording in progress...' : 'रिकॉर्डिंग चल रही है...'}
+                            </p>
+                          </div>
+                        )}
+                      </>
+                    ) : (
+                      <div className="text-center space-y-3">
+                        <p className="text-green-600 font-medium">
+                          ✓ {language === 'en' ? 'Recording completed' : 'रिकॉर्डिंग पूर्ण'}
+                        </p>
+                        <p className="text-sm text-gray-600">
+                          {language === 'en' ? 'Duration:' : 'अवधि:'} {formatTime(recordingTime)}
+                        </p>
+                        <Button variant="outline" onClick={() => {
+                          setHasRecording(false);
+                          setAudioBlob(null);
+                          setRecordingTime(0);
+                        }}>
+                          {language === 'en' ? 'Record Again' : 'फिर से रिकॉर्ड करें'}
+                        </Button>
+                      </div>
+                    )}
                   </div>
-                )}
+                </div>
               </Card>
             </motion.div>
 
@@ -456,7 +406,7 @@ export function DailyLogEntry() {
             >
               <Button
                 onClick={handleProcessInput}
-                disabled={isProcessing || (inputMode === 'text' && !textInput.trim()) || (inputMode === 'audio' && !hasRecording)}
+                disabled={isProcessing || !hasRecording}
                 className="w-full h-14 bg-gradient-to-r from-green-600 to-green-700 hover:from-green-700 hover:to-green-800 text-white font-medium"
               >
                 {isProcessing ? (
