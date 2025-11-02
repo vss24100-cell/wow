@@ -1,12 +1,12 @@
-import React, { useContext, useState, useEffect } from 'react';
+import { useContext, useState, useEffect } from 'react';
 import { AppContext } from '../App';
 import { translations } from './mockData';
-import { ArrowLeft, Calendar as CalendarIcon, ChevronLeft, ChevronRight, FileText, Mic, Image as ImageIcon, Clock, Filter, X, Loader2 } from 'lucide-react';
+import { ArrowLeft, Calendar as CalendarIcon, FileText, Mic, Image as ImageIcon, Filter, X, Loader2 } from 'lucide-react';
 import { Button } from './ui/button';
 import { Card } from './ui/card';
 import { Calendar } from './ui/calendar';
 import { Badge } from './ui/badge';
-import { Tabs, TabsContent, TabsList, TabsTrigger } from './ui/tabs';
+import { Tabs, TabsList, TabsTrigger } from './ui/tabs';
 import { motion } from 'motion/react';
 import { ImageWithFallback } from './figma/ImageWithFallback';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from './ui/select';
@@ -30,13 +30,11 @@ interface LogEntry {
 }
 
 export function LogHistory() {
-  const { language, setCurrentScreen, selectedAnimal, setSelectedAnimal } = useContext(AppContext);
-  const t = translations[language];
+  const { language, setCurrentScreen } = useContext(AppContext);
   const [selectedDate, setSelectedDate] = useState<Date | undefined>(new Date());
   const [viewMode, setViewMode] = useState<'calendar' | 'list'>('calendar');
   const [filterAnimal, setFilterAnimal] = useState<string>('all');
   const [logs, setLogs] = useState<LogEntry[]>([]);
-  const [animals, setAnimals] = useState<any[]>([]);
   const [isLoading, setIsLoading] = useState(true);
 
   // Fetch observations and animals from API
@@ -48,8 +46,6 @@ export function LogHistory() {
           api.getObservations(),
           api.getAnimals()
         ]);
-
-        setAnimals(animalsData);
 
         // Transform observations to LogEntry format
         const transformedLogs: LogEntry[] = observationsData.map((obs: any) => {
@@ -190,7 +186,7 @@ export function LogHistory() {
         </div>
 
         {/* View Toggle */}
-        <Tabs value={viewMode} onValueChange={(v) => setViewMode(v as any)} className="w-full">
+        <Tabs value={viewMode} onValueChange={(v: string) => setViewMode(v as 'calendar' | 'list')} className="w-full">
           <TabsList className="grid w-full grid-cols-2 bg-white/10">
             <TabsTrigger value="calendar" className="data-[state=active]:bg-white data-[state=active]:text-green-700">
               <CalendarIcon className="w-4 h-4 mr-2" />

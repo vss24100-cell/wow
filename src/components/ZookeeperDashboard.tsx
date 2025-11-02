@@ -40,8 +40,32 @@ export function ZookeeperDashboard() {
     setCurrentScreen('logHistory');
   };
 
-  const handleNotifications = () => {
-    toast.info(language === 'en' ? 'Notifications feature coming soon' : 'सूचना सुविधा जल्द आ रही है');
+  const handleNotifications = async () => {
+    try {
+      const observations = await api.getObservations();
+      const emergencyObs = observations.filter((obs: any) => obs.is_emergency);
+      
+      if (emergencyObs.length === 0) {
+        toast.info(language === 'en' ? 'No emergency notifications' : 'कोई आपातकालीन सूचना नहीं');
+        return;
+      }
+      
+      const animals = await api.getAnimals();
+      const emergencyMessages = emergencyObs.map((obs: any) => {
+        const animal = animals.find((a: any) => a.id === obs.animal_id);
+        return `${animal?.name || 'Unknown'}: ${obs.normal_behaviour_details || 'Emergency observation'}`;
+      });
+      
+      toast.error(
+        language === 'en' 
+          ? `${emergencyObs.length} Emergency Alert(s)!\n${emergencyMessages.slice(0, 3).join('\n')}` 
+          : `${emergencyObs.length} आपातकालीन अलर्ट!\n${emergencyMessages.slice(0, 3).join('\n')}`,
+        { duration: 8000 }
+      );
+    } catch (error) {
+      console.error('Failed to fetch notifications:', error);
+      toast.error(language === 'en' ? 'Failed to load notifications' : 'सूचनाएं लोड करने में विफल');
+    }
   };
 
   return (
