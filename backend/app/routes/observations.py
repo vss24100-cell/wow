@@ -38,6 +38,23 @@ async def create_observation(
     if not supabase:
         raise HTTPException(status_code=500, detail="Database not configured")
     
+    # Find or create animal by name
+    animal_result = supabase.table("animals").select("*").eq("name", observation_data.animal_name).execute()
+    
+    if animal_result.data and len(animal_result.data) > 0:
+        animal_id = animal_result.data[0]["id"]
+    else:
+        # Create new animal
+        new_animal = {
+            "id": str(uuid.uuid4()),
+            "name": observation_data.animal_name,
+            "species": "Unknown",
+            "health": "good",
+            "last_checked": datetime.utcnow().isoformat()
+        }
+        create_result = supabase.table("animals").insert(new_animal).execute()
+        animal_id = create_result.data[0]["id"]
+    
     structured_data = zoo_model.process_observation(
         observation_data.audio_text or "",
         observation_data.date
@@ -45,7 +62,7 @@ async def create_observation(
     
     new_observation = {
         "id": str(uuid.uuid4()),
-        "animal_id": observation_data.animal_id,
+        "animal_id": animal_id,
         "zookeeper_id": current_user["id"],
         "date_or_day": structured_data.date_or_day,
         "animal_observed_on_time": structured_data.animal_observed_on_time,
@@ -69,7 +86,7 @@ async def create_observation(
     
     supabase.table("animals").update({
         "last_checked": datetime.utcnow().isoformat()
-    }).eq("id", observation_data.animal_id).execute()
+    }).eq("id", animal_id).execute()
     
     return result.data[0]
 

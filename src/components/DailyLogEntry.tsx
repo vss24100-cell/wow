@@ -9,7 +9,6 @@ import { Label } from './ui/label';
 import { Input } from './ui/input';
 import { Textarea } from './ui/textarea';
 import { Checkbox } from './ui/checkbox';
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from './ui/select';
 import { toast } from 'sonner';
 import { api } from '../services/api';
 
@@ -34,8 +33,7 @@ export function DailyLogEntry() {
   const { language, setCurrentScreen, currentUser } = useContext(AppContext);
   const t = translations[language];
 
-  const [animals, setAnimals] = useState<any[]>([]);
-  const [selectedAnimalId, setSelectedAnimalId] = useState<string>('');
+  const [animalName, setAnimalName] = useState<string>('');
   const [selectedDate, setSelectedDate] = useState<string>(new Date().toISOString().split('T')[0]);
   const [inputMode, setInputMode] = useState<'audio' | 'text'>('text');
   const [textInput, setTextInput] = useState('');
@@ -70,22 +68,6 @@ export function DailyLogEntry() {
   const audioChunksRef = useRef<Blob[]>([]);
   const timerIntervalRef = useRef<NodeJS.Timeout | null>(null);
 
-  useEffect(() => {
-    const fetchAnimals = async () => {
-      try {
-        const animalsData = await api.getAnimals();
-        setAnimals(animalsData);
-        if (animalsData.length > 0) {
-          setSelectedAnimalId(animalsData[0].id);
-        }
-      } catch (error) {
-        console.error('Failed to fetch animals:', error);
-        toast.error(language === 'en' ? 'Failed to load animals' : 'जानवर लोड करने में विफल');
-      }
-    };
-
-    fetchAnimals();
-  }, [language]);
 
   useEffect(() => {
     if (isRecording) {
@@ -202,8 +184,8 @@ export function DailyLogEntry() {
   const [processedTranscript, setProcessedTranscript] = useState('');
 
   const handleProcessInput = async () => {
-    if (!selectedAnimalId) {
-      toast.error(language === 'en' ? 'Please select an animal' : 'कृपया एक जानवर चुनें');
+    if (!animalName.trim()) {
+      toast.error(language === 'en' ? 'Please enter animal name' : 'कृपया जानवर का नाम दर्ज करें');
       return;
     }
 
@@ -255,8 +237,8 @@ export function DailyLogEntry() {
   };
 
   const handleSubmitForm = async () => {
-    if (!selectedAnimalId) {
-      toast.error(language === 'en' ? 'Please select an animal' : 'कृपया एक जानवर चुनें');
+    if (!animalName.trim()) {
+      toast.error(language === 'en' ? 'Please enter animal name' : 'कृपया जानवर का नाम दर्ज करें');
       return;
     }
 
@@ -265,7 +247,7 @@ export function DailyLogEntry() {
 
     try {
       const observationData = {
-        animal_id: selectedAnimalId,
+        animal_name: animalName,
         audio_text: processedTranscript,
         date: selectedDate,
         is_emergency: false,
@@ -291,8 +273,6 @@ export function DailyLogEntry() {
     const secs = seconds % 60;
     return `${mins}:${secs.toString().padStart(2, '0')}`;
   };
-
-  const selectedAnimal = animals.find(a => a.id === selectedAnimalId);
 
   return (
     <motion.div 
@@ -335,20 +315,15 @@ export function DailyLogEntry() {
             >
               <Card className="p-6 bg-white dark:bg-gray-800">
                 <Label className="text-green-900 dark:text-green-100 mb-2 block">
-                  {language === 'en' ? 'Select Animal' : 'जानवर चुनें'}
+                  {language === 'en' ? 'Enter Animal Name' : 'जानवर का नाम दर्ज करें'}
                 </Label>
-                <Select value={selectedAnimalId} onValueChange={setSelectedAnimalId}>
-                  <SelectTrigger className="w-full">
-                    <SelectValue placeholder={language === 'en' ? 'Choose an animal' : 'एक जानवर चुनें'} />
-                  </SelectTrigger>
-                  <SelectContent>
-                    {animals.map((animal) => (
-                      <SelectItem key={animal.id} value={animal.id}>
-                        {animal.name} - {animal.species}
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
+                <Input
+                  type="text"
+                  value={animalName}
+                  onChange={(e) => setAnimalName(e.target.value)}
+                  placeholder={language === 'en' ? 'Enter animal name' : 'जानवर का नाम दर्ज करें'}
+                  className="w-full"
+                />
               </Card>
             </motion.div>
 
@@ -515,7 +490,7 @@ export function DailyLogEntry() {
               <div className="space-y-4 bg-white dark:bg-gray-800 p-4 rounded-lg">
                 <div>
                   <Label className="text-sm font-medium">{language === 'en' ? 'Animal' : 'जानवर'}</Label>
-                  <p className="text-base">{selectedAnimal?.name} - {selectedAnimal?.species}</p>
+                  <p className="text-base">{animalName}</p>
                 </div>
 
                 <div>

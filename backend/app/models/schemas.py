@@ -87,7 +87,7 @@ class Observation(BaseModel):
     created_at: Optional[datetime] = None
 
 class ObservationCreate(BaseModel):
-    animal_id: str
+    animal_name: str
     audio_text: Optional[str] = None
     date: str
     is_emergency: bool = False
